@@ -1,0 +1,46 @@
+{
+  "name": "feishu-codex-bridge",
+  "version": "0.1.0",
+  "description": "Bridge Feishu/Lark messages to the local Codex CLI.",
+  "type": "module",
+  "bin": {
+    "feishu-codex-bridge": "./bin/feishu-codex-bridge.mjs"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "examples",
+    "ACKNOWLEDGEMENTS.md",
+    "README.md",
+    "README.zh.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node --test",
+    "start": "node ./bin/feishu-codex-bridge.mjs run"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.65.0",
+    "https-proxy-agent": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "feishu",
+    "lark",
+    "codex",
+    "codex-cli",
+    "bot",
+    "bridge"
+  ],
+  "license": "MIT"
+}

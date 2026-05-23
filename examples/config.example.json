@@ -1,0 +1,33 @@
+{
+  "accounts": {
+    "app": {
+      "id": "cli_xxxxxxxxxxxxx",
+      "secret": "xxxxxxxxxxxxxxxxxxxx",
+      "tenant": "feishu"
+    }
+  },
+  "agent": {
+    "command": "codex",
+    "model": "",
+    "profile": "",
+    "sandbox": "workspace-write",
+    "askForApproval": "never",
+    "skipGitRepoCheck": true,
+    "extraArgs": []
+  },
+  "preferences": {
+    "replyMode": "card",
+    "requireMentionInGroup": true,
+    "respondToMentionAll": false,
+    "showToolCalls": true,
+    "maxConcurrentRuns": 1,
+    "stopGraceMs": 2000,
+    "idleTimeoutMinutes": 0,
+    "defaultCwd": "/Users/me/projects",
+    "access": {
+      "allowedUsers": [],
+      "allowedChats": [],
+      "admins": []
+    }
+  }
+}
