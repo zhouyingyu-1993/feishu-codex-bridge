@@ -5,12 +5,9 @@ export async function maybeAnswerQuickProjectQuestion({ prompt, cwd }) {
   const text = String(prompt || "").trim();
   if (!isProjectSummaryQuestion(text)) return "";
 
-  const [pkg, readme] = await Promise.all([
-    readPackage(cwd),
-    readReadme(cwd)
-  ]);
+  const [pkg, readme] = await Promise.all([readPackage(cwd), readReadme(cwd)]);
   const name = pkg.name || firstHeading(readme) || "这个项目";
-  const description = pkg.description || firstMeaningfulLine(readme);
+  const description = chineseDescription(readme) || firstMeaningfulLine(readme) || pkg.description;
 
   if (description) return `${name} 是一个${cleanDescription(description)}。`;
   return `${name} 是当前工作目录里的开源项目。`;
@@ -57,9 +54,18 @@ function firstMeaningfulLine(readme) {
     .find((line) => line && !line.startsWith("#") && !line.startsWith("[!") && !line.startsWith("```"));
 }
 
+function chineseDescription(readme) {
+  const lines = readme.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const line = lines.find((item) => item.includes("飞书") && item.includes("Codex") && !item.startsWith("#"));
+  return line || "";
+}
+
 function cleanDescription(description) {
   return String(description)
     .replace(/^一个/, "")
+    .replace(/^把/, "把")
     .replace(/^a\s+/i, "")
+    .replace(/[。.]$/, "")
+    .replace(/CLI$/i, "CLI 的开源桥接工具")
     .replace(/[。.]$/, "");
 }

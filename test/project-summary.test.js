@@ -21,6 +21,27 @@ test("answers project summary questions from package metadata", async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test("prefers Chinese README descriptions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "quick-summary-"));
+  await writeFile(join(dir, "package.json"), JSON.stringify({
+    name: "feishu-codex-bridge",
+    description: "Bridge Feishu messages to Codex"
+  }));
+  await writeFile(join(dir, "README.zh.md"), [
+    "# feishu-codex-bridge",
+    "",
+    "把飞书 / Lark 消息接到你本机的 Codex CLI。"
+  ].join("\n"));
+
+  const answer = await maybeAnswerQuickProjectQuestion({
+    prompt: "一句话介绍这个项目",
+    cwd: dir
+  });
+
+  assert.equal(answer, "feishu-codex-bridge 是一个把飞书 / Lark 消息接到你本机的 Codex CLI 的开源桥接工具。");
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("ignores non-summary prompts", async () => {
   const answer = await maybeAnswerQuickProjectQuestion({
     prompt: "帮我改代码",
