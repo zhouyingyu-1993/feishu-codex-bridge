@@ -9,7 +9,11 @@ export function renderRunCard(state, options = {}) {
       lines.push(`- ${mark} ${tool.name}`);
     }
   }
-  if (!lines.length) lines.push("Codex 正在思考...");
+  if (!lines.length && state.terminal === "idle_timeout") {
+    lines.push("超过设定时间仍未收到 Codex 输出，本次任务已自动停止。");
+  } else if (!lines.length) {
+    lines.push("Codex 正在思考...");
+  }
 
   return {
     schema: "2.0",

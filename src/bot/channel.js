@@ -159,11 +159,13 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
   const showToolCalls = cfg.preferences.showToolCalls;
   let state = { ...initialRunState };
   let timer;
+  let timedOut = false;
 
   const armIdle = () => {
     if (!idleMs) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
+      timedOut = true;
       handle.interrupted = true;
       void run.stop();
     }, idleMs);
@@ -174,7 +176,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     for await (const event of run.events) {
       if (timer) clearTimeout(timer);
       if (handle.interrupted) {
-        state = reduceRunState(state, { type: "interrupted" });
+        state = reduceRunState(state, { type: timedOut ? "idle_timeout" : "interrupted" });
         await flush(state);
         break;
       }
@@ -186,7 +188,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     }
     if (timer) clearTimeout(timer);
     if (state.terminal === "running") {
-      state = reduceRunState(state, handle.interrupted ? { type: "interrupted" } : { type: "result", text: "", success: true });
+      state = reduceRunState(state, handle.interrupted ? { type: timedOut ? "idle_timeout" : "interrupted" } : { type: "result", text: "", success: true });
       await flush(state);
     }
     await run.waitForExit();
