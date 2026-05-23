@@ -25,23 +25,8 @@ export function renderRunCard(state, options = {}) {
           content: lines.join("\n\n")
         },
         {
-          tag: "hr"
-        },
-        {
-          tag: "action",
-          actions: [
-            {
-              tag: "button",
-              text: { tag: "plain_text", content: "停止" },
-              type: "danger",
-              value: { command: "/stop" }
-            },
-            {
-              tag: "button",
-              text: { tag: "plain_text", content: "状态" },
-              value: { command: "/status" }
-            }
-          ]
+          tag: "markdown",
+          content: "_需要停止时，请直接发送 `/stop`；查看状态发送 `/status`。_"
         }
       ]
     }
@@ -78,12 +63,7 @@ export function renderWorkspacesCard(named) {
   return simpleCard("工作空间", entries.length ? entries.map(([name, cwd]) => `- \`${name}\` -> \`${cwd}\``) : ["还没有保存工作空间。"]);
 }
 
-export function simpleCard(title, lines, buttons = []) {
-  const actions = buttons.map((button) => ({
-    tag: "button",
-    text: { tag: "plain_text", content: button.text },
-    value: { command: button.command }
-  }));
+export function simpleCard(title, lines) {
   return {
     schema: "2.0",
     config: { wide_screen_mode: true },
@@ -93,8 +73,7 @@ export function simpleCard(title, lines, buttons = []) {
     },
     body: {
       elements: [
-        { tag: "markdown", content: lines.join("\n") },
-        ...(actions.length ? [{ tag: "hr" }, { tag: "action", actions }] : [])
+        { tag: "markdown", content: lines.join("\n") }
       ]
     }
   };
