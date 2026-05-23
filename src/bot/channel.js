@@ -7,6 +7,7 @@ import { renderRunCard, renderText } from "../card/render.js";
 import { logEvent } from "../core/logger.js";
 import { MediaCache } from "../media/cache.js";
 import { tryHandleCommand } from "../commands/index.js";
+import { maybeAnswerQuickProjectQuestion } from "../quick/project-summary.js";
 import { ActiveRuns } from "./active-runs.js";
 import { PendingQueue } from "./pending-queue.js";
 import { ProcessPool } from "./process-pool.js";
@@ -108,6 +109,13 @@ async function intakeMessage(ctx) {
   const handled = await tryHandleCommand({ ...ctx, scope });
   if (handled) {
     pending.cancel(scope);
+    return;
+  }
+
+  const cwd = ctx.workspaces.cwdFor(scope) || ctx.controls.cfg.preferences.defaultCwd;
+  const quickAnswer = await maybeAnswerQuickProjectQuestion({ prompt: msg.content, cwd });
+  if (quickAnswer) {
+    await channel.send(msg.chatId, { markdown: quickAnswer }, { replyTo: msg.messageId });
     return;
   }
 
