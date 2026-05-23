@@ -115,7 +115,8 @@ async function intakeMessage(ctx) {
   const cwd = ctx.workspaces.cwdFor(scope) || ctx.controls.cfg.preferences.defaultCwd;
   const quickAnswer = await maybeAnswerQuickProjectQuestion({ prompt: msg.content, cwd });
   if (quickAnswer) {
-    await channel.send(msg.chatId, { markdown: quickAnswer }, { replyTo: msg.messageId });
+    await ctx.channel.send(msg.chatId, { markdown: quickAnswer }, { replyTo: msg.messageId });
+    await logEvent("quick.answer", { scope, cwd, preview: quickAnswer.slice(0, 120) });
     return;
   }
 
