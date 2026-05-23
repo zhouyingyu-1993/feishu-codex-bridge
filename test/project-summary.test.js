@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { maybeAnswerQuickProjectQuestion } from "../src/quick/project-summary.js";
+import { maybeAnswerQuickLocalQuestion, maybeAnswerQuickProjectQuestion } from "../src/quick/project-summary.js";
 
 test("answers project summary questions from package metadata", async () => {
   const dir = await mkdtemp(join(tmpdir(), "quick-summary-"));
@@ -48,4 +48,22 @@ test("ignores non-summary prompts", async () => {
     cwd: process.cwd()
   });
   assert.equal(answer, "");
+});
+
+test("quickly answers main files questions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "quick-summary-"));
+  await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
+  await writeFile(join(dir, "README.zh.md"), "# demo\n");
+  await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
+  await writeFile(join(dir, "README.md"), "# demo\n");
+  await writeFile(join(dir, "src-placeholder"), "x");
+
+  const answer = await maybeAnswerQuickLocalQuestion({
+    prompt: "请列出这个项目的3个主要文件，不要改代码",
+    cwd: dir
+  });
+
+  assert.match(answer, /README\.zh\.md/);
+  assert.match(answer, /package\.json/);
+  await rm(dir, { recursive: true, force: true });
 });
