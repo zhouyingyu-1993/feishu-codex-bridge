@@ -99,6 +99,19 @@ test("parses confirmed edit proposals", () => {
   assert.equal(parsed.after, "新句子");
 });
 
+test("prefers file paths from the original user prompt", () => {
+  const parsed = parseConfirmedEditProposal([
+    "文件：README.zh",
+    "",
+    "修改前：`旧句子`",
+    "",
+    "修改后：`新句子`"
+  ].join("\n"), "/tmp/project", "请把 README.zh.md 里这句话改一下");
+
+  assert.equal(parsed.file, "/tmp/project/README.zh.md");
+  assert.equal(parsed.relativeFile, "README.zh.md");
+});
+
 test("applies confirmed edits by exact replacement", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "feishu-bridge-test-"));
   const file = join(cwd, "README.zh.md");

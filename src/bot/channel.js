@@ -396,7 +396,7 @@ export function buildApprovedPrompt(pendingEdit) {
 }
 
 export async function applyConfirmedEdit(pendingEdit) {
-  const parsed = parseConfirmedEditProposal(pendingEdit.proposal, pendingEdit.cwd);
+  const parsed = parseConfirmedEditProposal(pendingEdit.proposal, pendingEdit.cwd, pendingEdit.userPrompt);
   if (!parsed) {
     return {
       ok: false,
@@ -460,8 +460,8 @@ export async function applyConfirmedEdit(pendingEdit) {
   };
 }
 
-export function parseConfirmedEditProposal(proposal, cwd) {
-  const file = parseProposalFile(proposal, cwd);
+export function parseConfirmedEditProposal(proposal, cwd, userPrompt = "") {
+  const file = parsePromptFile(userPrompt, cwd) || parseProposalFile(proposal, cwd);
   const before = cleanProposalValue(extractProposalSection(proposal, "修改前", ["修改后"]));
   const after = cleanProposalValue(extractProposalSection(proposal, "修改后", ["确认后", "回复"]));
   if (!file || !before || !after) return null;
@@ -507,6 +507,12 @@ function parseProposalFile(proposal, cwd) {
     .replace(/[`*_]/g, "")
     .trim();
   return safeResolveFile(cleaned, cwd);
+}
+
+function parsePromptFile(prompt, cwd) {
+  const text = String(prompt || "");
+  const match = text.match(/([^\s"'“”‘’，,;；：:]+?\.[A-Za-z0-9][A-Za-z0-9._-]*)/);
+  return match ? safeResolveFile(match[1], cwd) : "";
 }
 
 function safeResolveFile(file, cwd) {
