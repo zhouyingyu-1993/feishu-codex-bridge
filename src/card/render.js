@@ -1,6 +1,9 @@
 export function renderRunCard(state, options = {}) {
   const title = titleFor(state.terminal);
   const lines = [];
+  if (state.terminal === "idle_timeout") {
+    lines.push(`**已因超时自动停止**：Codex 连续 ${formatDuration(state.timeoutMs)}没有输出。`);
+  }
   if (state.text?.trim()) lines.push(...chunkText(state.text.trim()));
   if (options.showToolCalls !== false && state.tools?.length) {
     lines.push("**工具调用**");
@@ -10,7 +13,7 @@ export function renderRunCard(state, options = {}) {
     }
   }
   if (!lines.length && state.terminal === "idle_timeout") {
-    lines.push("超过设定时间仍未收到 Codex 输出，本次任务已自动停止。");
+    lines.push(`已因超时自动停止：Codex 连续 ${formatDuration(state.timeoutMs)}没有输出。`);
   } else if (!lines.length) {
     lines.push("Codex 正在思考...");
   }
@@ -85,6 +88,9 @@ export function simpleCard(title, lines) {
 
 export function renderText(state, showToolCalls = true) {
   const parts = [];
+  if (state.terminal === "idle_timeout") {
+    parts.push(`已因超时自动停止：Codex 连续 ${formatDuration(state.timeoutMs)}没有输出。`);
+  }
   if (state.text?.trim()) parts.push(state.text.trim());
   if (showToolCalls && state.tools?.length) {
     parts.push(state.tools.map((tool) => `- ${tool.status}: ${tool.name}`).join("\n"));
@@ -112,4 +118,13 @@ function chunkText(text, limit = 5800) {
   const chunks = [];
   for (let i = 0; i < text.length; i += limit) chunks.push(text.slice(i, i + limit));
   return chunks;
+}
+
+function formatDuration(ms = 0) {
+  const seconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  if (!seconds) return "设定时间";
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分钟`;
 }

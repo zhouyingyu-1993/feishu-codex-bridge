@@ -17,3 +17,9 @@ test("reduces text and result", () => {
   assert.equal(state.text, "hello");
   assert.equal(state.terminal, "done");
 });
+
+test("keeps idle timeout duration in run state", () => {
+  const state = reduceRunState({ ...initialRunState }, { type: "idle_timeout", timeoutMs: 90000 });
+  assert.equal(state.terminal, "idle_timeout");
+  assert.equal(state.timeoutMs, 90000);
+});

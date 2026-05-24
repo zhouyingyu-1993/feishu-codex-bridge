@@ -3,7 +3,8 @@ export const initialRunState = {
   footer: "thinking",
   text: "",
   tools: [],
-  sessionId: ""
+  sessionId: "",
+  timeoutMs: 0
 };
 
 export function reduceRunState(state, event) {
@@ -41,7 +42,7 @@ export function reduceRunState(state, event) {
     return { ...state, terminal: "interrupted", footer: "interrupted" };
   }
   if (event.type === "idle_timeout") {
-    return { ...state, terminal: "idle_timeout", footer: "idle_timeout" };
+    return { ...state, terminal: "idle_timeout", footer: "idle_timeout", timeoutMs: event.timeoutMs || state.timeoutMs || 0 };
   }
   return state;
 }

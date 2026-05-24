@@ -176,7 +176,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     for await (const event of run.events) {
       if (timer) clearTimeout(timer);
       if (handle.interrupted) {
-        state = reduceRunState(state, { type: timedOut ? "idle_timeout" : "interrupted" });
+        state = reduceRunState(state, { type: timedOut ? "idle_timeout" : "interrupted", timeoutMs: idleMs });
         await flush(state);
         break;
       }
@@ -188,7 +188,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     }
     if (timer) clearTimeout(timer);
     if (state.terminal === "running") {
-      state = reduceRunState(state, handle.interrupted ? { type: timedOut ? "idle_timeout" : "interrupted" } : { type: "result", text: "", success: true });
+      state = reduceRunState(state, handle.interrupted ? { type: timedOut ? "idle_timeout" : "interrupted", timeoutMs: idleMs } : { type: "result", text: "", success: true });
       await flush(state);
     }
     await run.waitForExit();
