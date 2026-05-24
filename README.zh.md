@@ -4,7 +4,7 @@
 
 这个项目的目标很直接：复刻
 [`zarazhangrui/feishu-claude-code-bridge`](https://github.com/zarazhangrui/feishu-claude-code-bridge)
-的使用体验，但把本地执行的 Claude Code 换成 Codex。
+的使用体验，只是把原本在本地运行的 Claude Code 换成 Codex。
 
 ## 能做什么
 

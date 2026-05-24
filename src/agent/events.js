@@ -28,11 +28,12 @@ export function reduceRunState(state, event) {
     };
   }
   if (event.type === "result") {
+    const text = event.text?.trim() || state.text;
     return {
       ...state,
       terminal: event.success === false ? "error" : "done",
       footer: event.success === false ? "failed" : "done",
-      text: event.text && !state.text.includes(event.text) ? `${state.text}${state.text ? "\n\n" : ""}${event.text}` : state.text
+      text
     };
   }
   if (event.type === "error") {
@@ -49,11 +50,28 @@ export function reduceRunState(state, event) {
 
 export function normalizeCodexJson(value) {
   const events = [];
-  const sessionId = findStringByKey(value, ["session_id", "sessionId", "conversation_id", "conversationId"]);
+  const sessionId = findStringByKey(value, ["session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId"]);
   if (sessionId) events.push({ type: "system", sessionId });
 
   const type = String(value.type || value.event || value.kind || "");
   const lower = type.toLowerCase();
+  const item = value.item && typeof value.item === "object" ? value.item : null;
+
+  if (lower === "turn.completed" || lower === "turn.started") return events;
+
+  if (lower === "item.completed" && item) {
+    const itemType = String(item.type || "").toLowerCase();
+    if (itemType === "agent_message") {
+      const text = extractText(item);
+      if (text) events.push({ type: "text_delta", text });
+      return events;
+    }
+    if (itemType.includes("tool") || itemType.includes("exec") || itemType.includes("command")) {
+      const id = findStringByKey(item, ["call_id", "tool_call_id", "id"]) || `${Date.now()}`;
+      events.push({ type: "tool_result", id, output: extractText(item), isError: Boolean(item.error) });
+      return events;
+    }
+  }
 
   if (lower.includes("tool") || lower.includes("exec") || lower.includes("command")) {
     const id = findStringByKey(value, ["call_id", "tool_call_id", "id"]) || `${Date.now()}`;
