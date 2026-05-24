@@ -9,7 +9,9 @@ import { logEvent } from "../core/logger.js";
 import { MediaCache } from "../media/cache.js";
 import { tryHandleCommand } from "../commands/index.js";
 import { maybeAnswerQuickLocalQuestion } from "../quick/project-summary.js";
+import { isCloudDocumentRequest, runCloudDocumentRequest } from "../cloud-docs/create.js";
 import { ActiveRuns } from "./active-runs.js";
+import { handleCommentMention } from "./comments.js";
 import { PendingQueue } from "./pending-queue.js";
 import { ProcessPool } from "./process-pool.js";
 
@@ -80,6 +82,11 @@ export async function startChannel(deps) {
       };
       const scope = scopeFor(msg);
       await tryHandleCommand({ channel, msg, scope, sessions, workspaces, agent, activeRuns, controls, fromCardAction: true });
+    },
+    comment: async (evt) => {
+      await handleCommentMention({ channel, evt, agent, sessions, workspaces, controls }).catch((err) => {
+        void logEvent("comment.error", { message: err?.message || String(err) });
+      });
     },
     reconnecting: () => logEvent("ws.reconnecting"),
     reconnected: () => logEvent("ws.reconnected"),
@@ -178,7 +185,12 @@ async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns,
   const attachments = await media.resolve(first.chatId, resources);
   const cwd = workspaces.cwdFor(scope) || controls.cfg.preferences.defaultCwd || homedir();
   await ensureDirectory(cwd);
-  if (requiresEditConfirmation(batch.map((message) => message.content || "").join("\n\n"))) {
+  const userText = batch.map((message) => message.content || "").filter(Boolean).join("\n\n");
+  if (isCloudDocumentRequest(userText)) {
+    await runCloudDocumentRequest({ channel, agent, sessions, workspaces, activeRuns, controls, scope, msg: last, cwd, userText });
+    return;
+  }
+  if (requiresEditConfirmation(userText)) {
     await runEditProposal({ channel, agent, sessions, activeRuns, pendingEdits, batch, attachments, controls, scope, cwd, msg: last });
     return;
   }

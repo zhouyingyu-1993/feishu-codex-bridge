@@ -6,6 +6,7 @@ import { gcMediaCache } from "../media/cache.js";
 import { paths } from "../config/paths.js";
 import { loadConfig, loadOrCreateConfig, saveConfig } from "../config/store.js";
 import { createCodexAgent } from "../agent/codex.js";
+import { preFlightChecks } from "./preflight.js";
 import { SessionStore } from "../session/store.js";
 import { WorkspaceStore } from "../workspace/store.js";
 import { readRegistry, registerProcess, resolveProcess, unregisterProcess, unregisterProcessSync } from "../runtime/registry.js";
@@ -50,6 +51,7 @@ async function runForeground(opts) {
   if (!cfg.accounts.app.id || !cfg.accounts.app.secret) {
     throw new Error(`请先填写飞书应用配置：${configPath}`);
   }
+  await preFlightChecks(opts);
   await Promise.all([gcLogs(), gcMediaCache()]);
   const version = await packageVersion();
   const entry = await registerProcess({
@@ -157,6 +159,7 @@ function parseOptions(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "-c" || arg === "--config") opts.config = resolve(argv[++i]);
+    else if (arg === "--skip-check-lark-cli") opts.skipCheckLarkCli = true;
   }
   return opts;
 }
@@ -173,7 +176,7 @@ function printHelp() {
 
 Usage:
   feishu-codex-bridge init [-c config.json]
-  feishu-codex-bridge run [-c config.json]
+  feishu-codex-bridge run [-c config.json] [--skip-check-lark-cli]
   feishu-codex-bridge ps
   feishu-codex-bridge kill <id|#>
   feishu-codex-bridge start [-c config.json]

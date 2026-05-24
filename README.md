@@ -15,6 +15,8 @@ Claude Code.
 - Interrupts an active run when a new message arrives, then batches rapid messages into the next run.
 - Supports named workspaces with `/ws`.
 - Downloads Feishu images/files to local cache and passes local paths to Codex.
+- Handles cloud-doc comment mentions and replies in the same comment thread.
+- Can create Feishu/Lark cloud documents from chat requests and post the created document link back to the current conversation.
 - Provides interactive cards for `/help`, `/status`, `/ws list`, and stop/status buttons.
 - Supports host process commands: `run`, `start`, `stop`, `restart`, `status`, `ps`, `kill`, `unregister`, `migrate`.
 - Supports Feishu slash commands: `/new`, `/reset`, `/cd`, `/ws`, `/status`, `/config`, `/stop`, `/timeout`, `/ps`, `/exit`, `/reconnect`, `/doctor`, `/help`.
@@ -31,6 +33,8 @@ codex login
 ```
 
 - A Feishu/Lark PersonalAgent app. On first run, the bridge tries to open the Feishu SDK QR-code registration wizard.
+- For cloud-doc comments, document creation, parent document search, or wiki-node creation, enable the relevant Feishu/Lark cloud-document, search, and comment permissions, and add the bot to the target document or wiki space.
+- Optional: install `lark-cli` so Codex can call deeper Feishu/Lark commands when it needs more cloud-context.
 
 ## Install
 

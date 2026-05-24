@@ -36,6 +36,10 @@ export function runCodex(config, options) {
     });
 
     await logEvent("codex.spawn", { command, args: redactArgs(args), cwd: options.cwd });
+    child.once("error", (err) => {
+      if (err?.name === "AbortError" || err?.code === "ABORT_ERR") return;
+      out.push({ type: "error", message: err?.message || String(err) });
+    });
     child.stdin.end(options.prompt);
 
     exitPromise = new Promise((resolve) => {
