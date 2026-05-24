@@ -16,6 +16,7 @@ import {
 } from "../media/transcribe.js";
 import { tryHandleCommand } from "../commands/index.js";
 import { maybeAnswerQuickLocalQuestion } from "../quick/project-summary.js";
+import { maybeAnswerNewsQuestion } from "../quick/news.js";
 import { isCloudDocumentRequest, runCloudDocumentRequest } from "../cloud-docs/create.js";
 import { ActiveRuns } from "./active-runs.js";
 import { handleCommentMention } from "./comments.js";
@@ -169,6 +170,13 @@ async function intakeMessage(ctx) {
   }
 
   const cwd = ctx.workspaces.cwdFor(scope) || ctx.controls.cfg.preferences.defaultCwd;
+  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: msg.content });
+  if (newsAnswer) {
+    await ctx.channel.send(msg.chatId, { markdown: newsAnswer }, { replyTo: msg.messageId });
+    await logEvent("quick.news", { scope, cwd, preview: newsAnswer.slice(0, 120) });
+    return;
+  }
+
   const quickAnswer = await maybeAnswerQuickLocalQuestion({ prompt: msg.content, cwd });
   if (quickAnswer) {
     await ctx.channel.send(msg.chatId, { markdown: quickAnswer }, { replyTo: msg.messageId });
@@ -198,6 +206,13 @@ async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns,
   const cwd = workspaces.cwdFor(scope) || controls.cfg.preferences.defaultCwd || homedir();
   await ensureDirectory(cwd);
   const userText = buildUserText(batch, attachments);
+  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: userText });
+  if (newsAnswer) {
+    await channel.send(last.chatId, { markdown: newsAnswer }, { replyTo: last.messageId });
+    await logEvent("quick.news", { scope, cwd, source: "batch", preview: newsAnswer.slice(0, 120) });
+    return;
+  }
+
   const quickAnswer = await maybeAnswerQuickLocalQuestion({ prompt: userText, cwd });
   if (quickAnswer) {
     await channel.send(last.chatId, { markdown: quickAnswer }, { replyTo: last.messageId });

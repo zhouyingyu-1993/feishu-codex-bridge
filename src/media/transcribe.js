@@ -78,16 +78,26 @@ async function transcribeWithFasterWhisper(sourcePath) {
     "import sys",
     "from faster_whisper import WhisperModel",
     "path = sys.argv[1]",
-    "model_name = sys.argv[2]",
-    "model = WhisperModel(model_name, device='cpu', compute_type='int8', local_files_only=True)",
-    "segments, info = model.transcribe(path, language='zh', beam_size=1, vad_filter=False)",
-    "print(''.join(segment.text for segment in segments).strip())"
+    "models = [item.strip() for item in sys.argv[2].split(',') if item.strip()]",
+    "last_error = None",
+    "for model_name in models:",
+    "    try:",
+    "        model = WhisperModel(model_name, device='cpu', compute_type='int8', local_files_only=True)",
+    "        segments, info = model.transcribe(path, language='zh', beam_size=1, vad_filter=False)",
+    "        text = ''.join(segment.text for segment in segments).strip()",
+    "        if text:",
+    "            print(text)",
+    "            sys.exit(0)",
+    "        last_error = Exception('empty transcript')",
+    "    except Exception as exc:",
+    "        last_error = exc",
+    "raise RuntimeError(str(last_error or 'no local whisper model worked'))"
   ].join("\n");
   const output = await runCommandCapture("python3", [
     "-c",
     script,
     sourcePath,
-    process.env.FEISHU_CODEX_BRIDGE_WHISPER_MODEL || "tiny"
+    process.env.FEISHU_CODEX_BRIDGE_WHISPER_MODEL || "base,tiny"
   ], 120_000);
   const text = output.trim();
   if (!text) throw new Error("没有识别出文字");
