@@ -33,3 +33,20 @@ test("builds current codex exec args without deprecated approval flag", () => {
   ]);
   assert.equal(args.includes("-a"), false);
 });
+
+test("allows per-run sandbox override for confirmation proposals", () => {
+  const args = buildArgs(
+    {
+      sandbox: "workspace-write",
+      extraArgs: []
+    },
+    {
+      cwd: "/tmp/project",
+      images: [],
+      sandbox: "read-only"
+    },
+    "/tmp/last-message.txt"
+  );
+
+  assert.equal(args[args.indexOf("-s") + 1], "read-only");
+});

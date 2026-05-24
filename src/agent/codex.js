@@ -88,7 +88,8 @@ export function buildArgs(config, options, finalFile) {
     args.push("--json", "--skip-git-repo-check", "-C", options.cwd, "-o", finalFile);
     if (config.model) args.push("-m", config.model);
     if (config.profile) args.push("-p", config.profile);
-    if (config.sandbox) args.push("-s", config.sandbox);
+    const sandbox = options.sandbox ?? config.sandbox;
+    if (sandbox) args.push("-s", sandbox);
     for (const image of options.images || []) args.push("-i", image);
     args.push(...(config.extraArgs || []), "-");
   }
