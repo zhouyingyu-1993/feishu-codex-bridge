@@ -42,6 +42,25 @@ test("prefers Chinese README descriptions", async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test("answers project summary wording from voice transcripts", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "quick-summary-"));
+  await writeFile(join(dir, "package.json"), JSON.stringify({ name: "feishu-codex-bridge" }));
+  await writeFile(join(dir, "README.zh.md"), [
+    "# feishu-codex-bridge",
+    "",
+    "把飞书 / Lark 消息接到你本机的 Codex CLI。"
+  ].join("\n"));
+
+  const answer = await maybeAnswerQuickLocalQuestion({
+    prompt: "你一句话帮我总结一下这项目",
+    cwd: dir
+  });
+
+  assert.match(answer, /feishu-codex-bridge/);
+  assert.match(answer, /飞书/);
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("ignores non-summary prompts", async () => {
   const answer = await maybeAnswerQuickProjectQuestion({
     prompt: "帮我改代码",

@@ -32,6 +32,11 @@ test("detects news requests from audio transcripts", () => {
   const traditional = normalizeNewsText("音频转写：幫我總結2026年5月24日AHA的10條新聞資訊重點看美國和中國");
   assert.match(traditional, /AI的/);
   assert.equal(isNewsQuestion(traditional), true);
+
+  const noisy = normalizeNewsText("音频转写：很好你在帮我把2026年5月24日发生的夜夜圈的新闻秩序给我食调最热的最热门的");
+  assert.match(noisy, /AI圈/);
+  assert.match(noisy, /新闻资讯/);
+  assert.equal(isNewsQuestion(noisy), true);
 });
 
 test("parses rss news items", () => {
@@ -59,4 +64,16 @@ test("answers news requests from rss search", async () => {
   assert.match(answer, /美国 AI 芯片公司扩大产能/);
   assert.ok(urls.some((url) => decodeURIComponent(url).includes("美国")));
   assert.ok(urls.some((url) => decodeURIComponent(url).includes("中国")));
+});
+
+test("answers noisy transcribed news requests", async () => {
+  const fetchImpl = async () => ({ ok: true, text: async () => RSS });
+  const answer = await maybeAnswerNewsQuestion({
+    prompt: "音频转写：很好你在帮我把2026年5月24日发生的夜夜圈的新闻秩序给我食调最热的最热门的",
+    fetchImpl,
+    now: new Date("2026-05-24T12:00:00Z")
+  });
+
+  assert.match(answer, /我查到的 AI 新闻重点/);
+  assert.match(answer, /中国 AI 公司发布新模型/);
 });

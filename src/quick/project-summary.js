@@ -85,8 +85,8 @@ function isCapabilityQuestion(text) {
 
 function isProjectSummaryQuestion(text) {
   return [
-    /一句话.*(介绍|说明).*项目/,
-    /这个项目.*(做什么|是什么|介绍)/,
+    /一句话.*(介绍|说明|总结|概括).*(项目|这项目|这个项目)/,
+    /(这个项目|这项目).*(做什么|是什么|介绍|总结|概括)/,
     /项目.*(做什么|是什么)/,
     /what.*(project|repo).*do/i,
     /summari[sz]e.*(project|repo)/i

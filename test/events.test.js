@@ -41,6 +41,14 @@ test("uses final result text over interim text", () => {
   assert.equal(state.terminal, "done");
 });
 
+test("drops process-only codex chatter", () => {
+  let state = { ...initialRunState };
+  state = reduceRunState(state, { type: "text_delta", text: "Codex 正在思考..." });
+  state = reduceRunState(state, { type: "result", text: "", success: true });
+  assert.match(state.text, /没有返回最终结果/);
+  assert.equal(state.terminal, "done");
+});
+
 test("keeps idle timeout duration in run state", () => {
   const state = reduceRunState({ ...initialRunState }, { type: "idle_timeout", timeoutMs: 90000 });
   assert.equal(state.terminal, "idle_timeout");
