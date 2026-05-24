@@ -11,7 +11,6 @@
     "model": "",
     "profile": "",
     "sandbox": "workspace-write",
-    "askForApproval": "never",
     "skipGitRepoCheck": true,
     "extraArgs": []
   },

@@ -8,8 +8,9 @@ export function renderRunCard(state, options = {}) {
   if (options.showToolCalls !== false && state.tools?.length) {
     lines.push("**工具调用**");
     for (const tool of state.tools.slice(-8)) {
-      const mark = tool.status === "done" ? "OK" : tool.status === "error" ? "ERR" : "...";
-      lines.push(`- ${mark} ${tool.name}`);
+      const mark = tool.name === "codex stderr" || tool.status === "error" ? "ERR" : tool.status === "done" ? "OK" : "...";
+      const detail = toolDetail(tool);
+      lines.push(`- ${mark} ${tool.name}${detail ? `：${detail}` : ""}`);
     }
   }
   if (!lines.length && state.terminal === "idle_timeout") {
@@ -93,7 +94,10 @@ export function renderText(state, showToolCalls = true) {
   }
   if (state.text?.trim()) parts.push(state.text.trim());
   if (showToolCalls && state.tools?.length) {
-    parts.push(state.tools.map((tool) => `- ${tool.status}: ${tool.name}`).join("\n"));
+    parts.push(state.tools.map((tool) => {
+      const detail = toolDetail(tool);
+      return `- ${tool.status}: ${tool.name}${detail ? `: ${detail}` : ""}`;
+    }).join("\n"));
   }
   if (!parts.length) parts.push("Codex 没有返回可展示内容。");
   return parts.join("\n\n");
@@ -127,4 +131,14 @@ function formatDuration(ms = 0) {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分钟`;
+}
+
+function toolDetail(tool) {
+  if (tool.name !== "codex stderr" || !tool.input) return "";
+  return truncateInline(tool.input, 180);
+}
+
+function truncateInline(text, limit) {
+  const normalized = String(text).replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, limit - 1)}...` : normalized;
 }

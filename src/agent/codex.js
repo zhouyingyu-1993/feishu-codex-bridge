@@ -78,7 +78,7 @@ export function runCodex(config, options) {
   };
 }
 
-function buildArgs(config, options, finalFile) {
+export function buildArgs(config, options, finalFile) {
   const args = ["exec"];
   if (options.sessionId) {
     args.push("resume", "--json", "--skip-git-repo-check", "-o", finalFile);
@@ -89,7 +89,6 @@ function buildArgs(config, options, finalFile) {
     if (config.model) args.push("-m", config.model);
     if (config.profile) args.push("-p", config.profile);
     if (config.sandbox) args.push("-s", config.sandbox);
-    if (config.askForApproval) args.push("-a", config.askForApproval);
     for (const image of options.images || []) args.push("-i", image);
     args.push(...(config.extraArgs || []), "-");
   }
@@ -110,9 +109,17 @@ async function consumeStdout(stream, out) {
 
 async function consumeStderr(stream, out) {
   for await (const line of readLines(stream)) {
-    if (!line.trim() || line.includes("could not update PATH")) continue;
+    if (isIgnorableCodexStderr(line)) continue;
     out.push({ type: "tool_use", id: `stderr-${Date.now()}`, name: "codex stderr", input: line });
   }
+}
+
+function isIgnorableCodexStderr(line) {
+  return !line.trim()
+    || line.includes("could not update PATH")
+    || line.includes("ignoring interface.icon_small")
+    || line.includes("ignoring interface.icon_large")
+    || line.includes("Failed to kill MCP process group");
 }
 
 function createAsyncQueue() {

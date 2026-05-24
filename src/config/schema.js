@@ -14,7 +14,6 @@ export function defaultConfig() {
       model: "",
       profile: "",
       sandbox: "workspace-write",
-      askForApproval: "never",
       skipGitRepoCheck: true,
       extraArgs: []
     },
@@ -43,9 +42,6 @@ export function normalizeConfig(input = {}) {
   if (!["card", "markdown", "text"].includes(cfg.preferences.replyMode)) cfg.preferences.replyMode = "card";
   if (!["read-only", "workspace-write", "danger-full-access"].includes(cfg.agent.sandbox)) {
     cfg.agent.sandbox = "workspace-write";
-  }
-  if (!["untrusted", "on-request", "never"].includes(cfg.agent.askForApproval)) {
-    cfg.agent.askForApproval = "never";
   }
   cfg.preferences.maxConcurrentRuns = positiveInteger(cfg.preferences.maxConcurrentRuns, 1);
   cfg.preferences.stopGraceMs = positiveInteger(cfg.preferences.stopGraceMs, 2000);
