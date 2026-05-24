@@ -15,7 +15,22 @@ export class MediaCache {
     const files = [];
     for (const item of items) {
       const local = await this.resolveOne(dir, item).catch(async (err) => {
-        await logEvent("media.error", { message: err?.message || String(err), fileKey: item.resource?.fileKey });
+        await logEvent("media.error", {
+          message: err?.message || String(err),
+          code: err?.response?.data?.code || "",
+          status: err?.response?.status || "",
+          fileKey: item.resource?.fileKey,
+          type: item.resource?.type
+        });
+        if (item.resource?.type === "audio") {
+          return {
+            path: "",
+            kind: "audio",
+            originalName: item.resource.fileName || "",
+            durationMs: item.resource.durationMs || 0,
+            transcriptionError: `语音文件下载失败：${mediaErrorMessage(err)}`
+          };
+        }
         return null;
       });
       if (local) files.push(local);
@@ -35,12 +50,16 @@ export class MediaCache {
       // Not cached yet.
     }
     const result = await this.channel.rawClient.im.v1.messageResource.get({
-      params: { type: resource.type },
+      params: { type: resourceDownloadType(resource.type) },
       path: { message_id: item.messageId, file_key: resource.fileKey }
     });
     await result.writeFile(path);
     return { path, kind: resource.type || "file", originalName: resource.fileName || "", durationMs: resource.durationMs || 0 };
   }
+}
+
+export function resourceDownloadType(type) {
+  return type === "image" ? "image" : "file";
 }
 
 export async function gcMediaCache(maxAgeMs = 24 * 60 * 60 * 1000) {
@@ -66,4 +85,10 @@ function defaultName(type) {
   if (type === "audio") return "audio.ogg";
   if (type === "video") return "video.mp4";
   return "file.bin";
+}
+
+function mediaErrorMessage(err) {
+  const code = err?.response?.data?.code;
+  const msg = err?.response?.data?.msg || err?.message || String(err);
+  return code ? `${code} ${msg}` : msg;
 }
