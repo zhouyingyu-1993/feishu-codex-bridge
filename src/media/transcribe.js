@@ -33,6 +33,24 @@ export async function transcribeAudioAttachments({ channel, attachments }) {
 }
 
 export async function transcribeAudioFile(channel, sourcePath) {
+  const errors = [];
+  try {
+    return await transcribeWithFeishu(channel, sourcePath);
+  } catch (err) {
+    errors.push(`飞书 ASR：${explainTranscriptionError(err)}`);
+    await logEvent("audio.feishu_asr.error", { path: sourcePath, message: explainTranscriptionError(err) });
+  }
+
+  try {
+    return await transcribeWithFasterWhisper(sourcePath);
+  } catch (err) {
+    errors.push(`本机 faster-whisper：${err?.message || String(err)}`);
+  }
+
+  throw new Error(errors.join("；"));
+}
+
+async function transcribeWithFeishu(channel, sourcePath) {
   const pcmPath = await convertToPcm(sourcePath);
   try {
     const pcm = await readFile(pcmPath);
@@ -53,6 +71,27 @@ export async function transcribeAudioFile(channel, sourcePath) {
     await rm(pcmPath, { force: true }).catch(() => {});
     await rm(dirname(pcmPath), { recursive: true, force: true }).catch(() => {});
   }
+}
+
+async function transcribeWithFasterWhisper(sourcePath) {
+  const script = [
+    "import sys",
+    "from faster_whisper import WhisperModel",
+    "path = sys.argv[1]",
+    "model_name = sys.argv[2]",
+    "model = WhisperModel(model_name, device='cpu', compute_type='int8', local_files_only=True)",
+    "segments, info = model.transcribe(path, language='zh', beam_size=1, vad_filter=False)",
+    "print(''.join(segment.text for segment in segments).strip())"
+  ].join("\n");
+  const output = await runCommandCapture("python3", [
+    "-c",
+    script,
+    sourcePath,
+    process.env.FEISHU_CODEX_BRIDGE_WHISPER_MODEL || "tiny"
+  ], 120_000);
+  const text = output.trim();
+  if (!text) throw new Error("没有识别出文字");
+  return text;
 }
 
 async function convertToPcm(sourcePath) {
@@ -82,14 +121,22 @@ async function convertToPcm(sourcePath) {
 }
 
 function runCommand(command, args, timeoutMs) {
+  return runCommandCapture(command, args, timeoutMs).then(() => undefined);
+}
+
+function runCommandCapture(command, args, timeoutMs) {
   return new Promise((resolve, reject) => {
+    let stdout = "";
     let stderr = "";
-    const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
       reject(new Error(`${command} timed out`));
     }, timeoutMs);
 
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
     child.stderr.on("data", (chunk) => {
       stderr += chunk.toString("utf8");
     });
@@ -99,7 +146,7 @@ function runCommand(command, args, timeoutMs) {
     });
     child.once("close", (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
+      if (code === 0) resolve(stdout);
       else reject(new Error(`${command} exited with code ${code}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
     });
   });
