@@ -16,7 +16,7 @@ import {
 } from "../media/transcribe.js";
 import { tryHandleCommand } from "../commands/index.js";
 import { maybeAnswerQuickLocalQuestion } from "../quick/project-summary.js";
-import { maybeAnswerNewsQuestion } from "../quick/news.js";
+import { isNewsQuestion, isNewsSourceFollowUp, maybeAnswerNewsQuestion } from "../quick/news.js";
 import { isCloudDocumentRequest, runCloudDocumentRequest } from "../cloud-docs/create.js";
 import { ActiveRuns } from "./active-runs.js";
 import { handleCommentMention } from "./comments.js";
@@ -40,11 +40,12 @@ export async function startChannel(deps) {
   const media = new MediaCache(null);
   const pool = new ProcessPool(() => controls.cfg.preferences.maxConcurrentRuns);
   const pendingEdits = new Map();
+  const lastNewsPrompts = new Map();
   const pending = new PendingQueue(DEBOUNCE_MS, async (scope, batch) => {
     pending.block(scope);
     const release = await pool.acquire();
     try {
-      await runAgentBatch({ channel, agent, sessions, workspaces, activeRuns, media, pendingEdits, batch, controls, scope });
+      await runAgentBatch({ channel, agent, sessions, workspaces, activeRuns, media, pendingEdits, lastNewsPrompts, batch, controls, scope });
     } catch (err) {
       await logEvent("batch.error", { message: err?.message || String(err), scope });
     } finally {
@@ -72,7 +73,7 @@ export async function startChannel(deps) {
 
   channel.on({
     message: async (msg) => {
-      await intakeMessage({ channel, agent, sessions, workspaces, activeRuns, pending, pendingEdits, pool, msg, controls }).catch((err) => {
+      await intakeMessage({ channel, agent, sessions, workspaces, activeRuns, pending, pendingEdits, lastNewsPrompts, pool, msg, controls }).catch((err) => {
         void logEvent("message.error", { message: err?.message || String(err), chatId: msg.chatId });
       });
     },
@@ -110,6 +111,7 @@ export async function startChannel(deps) {
     async disconnect() {
       pending.cancelAll();
       pendingEdits.clear();
+      lastNewsPrompts.clear();
       await activeRuns.stopAll();
       await Promise.allSettled([sessions.flush(), workspaces.flush()]);
       await channel.disconnect();
@@ -170,8 +172,10 @@ async function intakeMessage(ctx) {
   }
 
   const cwd = ctx.workspaces.cwdFor(scope) || ctx.controls.cfg.preferences.defaultCwd;
-  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: msg.content });
+  const previousNewsPrompt = ctx.lastNewsPrompts.get(scope) || "";
+  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: msg.content, previousPrompt: previousNewsPrompt });
   if (newsAnswer) {
+    rememberNewsPrompt(ctx.lastNewsPrompts, scope, msg.content, previousNewsPrompt);
     await ctx.channel.send(msg.chatId, { markdown: newsAnswer }, { replyTo: msg.messageId });
     await logEvent("quick.news", { scope, cwd, preview: newsAnswer.slice(0, 120) });
     return;
@@ -192,7 +196,7 @@ async function intakeMessage(ctx) {
   pending.push(scope, msg);
 }
 
-async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns, media, pendingEdits, batch, controls, scope }) {
+async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns, media, pendingEdits, lastNewsPrompts, batch, controls, scope }) {
   const first = batch[0];
   const last = batch[batch.length - 1];
   if (!first || !last) return;
@@ -206,8 +210,10 @@ async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns,
   const cwd = workspaces.cwdFor(scope) || controls.cfg.preferences.defaultCwd || homedir();
   await ensureDirectory(cwd);
   const userText = buildUserText(batch, attachments);
-  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: userText });
+  const previousNewsPrompt = lastNewsPrompts.get(scope) || "";
+  const newsAnswer = await maybeAnswerNewsQuestion({ prompt: userText, previousPrompt: previousNewsPrompt });
   if (newsAnswer) {
+    rememberNewsPrompt(lastNewsPrompts, scope, userText, previousNewsPrompt);
     await channel.send(last.chatId, { markdown: newsAnswer }, { replyTo: last.messageId });
     await logEvent("quick.news", { scope, cwd, source: "batch", preview: newsAnswer.slice(0, 120) });
     return;
@@ -243,6 +249,11 @@ async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns,
   await replyWithRun({ channel, run, handle, sessions, scope, cwd, msg: last, cfg: controls.cfg, idleMs }).finally(() => {
     activeRuns.unregister(scope, run);
   });
+}
+
+function rememberNewsPrompt(store, scope, text, previousText = "") {
+  if (isNewsQuestion(text)) store.set(scope, text);
+  else if (previousText && isNewsSourceFollowUp(text)) store.set(scope, previousText);
 }
 
 async function runEditProposal({ channel, agent, sessions, activeRuns, pendingEdits, batch, attachments, controls, scope, cwd, msg }) {

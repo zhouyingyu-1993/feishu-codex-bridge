@@ -1,5 +1,7 @@
 const NEWS_WORD_RE = /(新闻|新聞|資訊|资讯|秩序|快讯|快訊|热点|熱點|动态|動態|news)/i;
-const AI_WORD_RE = /(AI|AIA|AHA|人工智能|大模型|模型|OpenAI|Claude|Gemini|智能体|智能體|机器人|機器人|芯片|晶片|算力|夜夜圈|爷爷圈|爺爺圈)/i;
+const AI_WORD_RE = /(AI|AIA|AHA|AZ|人工智能|大模型|模型|OpenAI|Claude|Gemini|智能体|智能體|机器人|機器人|芯片|晶片|算力|夜夜圈|爷爷圈|爺爺圈)/i;
+const SOURCE_WORD_RE = /(来源|來源|来远|出处|出處|链接|連結|原文|source|link|url)/i;
+const SOURCE_FOLLOWUP_RE = /(新闻|新聞|资讯|資訊|10条|十条|十條|这|這|这些|這些|上面|刚才|剛才|附上|补上|補上|翻译|翻譯|中文|中纹)/i;
 const AI_NEWS_FEEDS = [
   "https://venturebeat.com/category/ai/feed/",
   "https://www.technologyreview.com/topic/artificial-intelligence/feed/",
@@ -7,9 +9,15 @@ const AI_NEWS_FEEDS = [
   "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"
 ];
 
-export async function maybeAnswerNewsQuestion({ prompt, fetchImpl = globalThis.fetch, now = new Date() }) {
-  const text = normalizeNewsText(prompt);
-  if (!isNewsQuestion(text)) return "";
+export async function maybeAnswerNewsQuestion({ prompt, previousPrompt = "", fetchImpl = globalThis.fetch, now = new Date() }) {
+  const currentText = normalizeNewsText(prompt);
+  const sourceFollowUp = isNewsSourceFollowUp(currentText);
+  const text = sourceFollowUp && previousPrompt
+    ? `${normalizeNewsText(previousPrompt)}\n要求：每条都附上来源和链接。`
+    : currentText;
+  if (!isNewsQuestion(text)) {
+    return sourceFollowUp ? "我可以补来源，但当前没有上一条新闻主题。请重新发一次要查的新闻主题，并说“附上来源”。" : "";
+  }
   if (typeof fetchImpl !== "function") return "现在无法联网查询新闻：当前运行环境没有可用的 fetch。";
 
   const limit = requestedCount(text) || 8;
@@ -45,13 +53,22 @@ export function isNewsQuestion(text) {
   );
 }
 
+export function isNewsSourceFollowUp(text) {
+  const value = normalizeNewsText(text);
+  return SOURCE_WORD_RE.test(value) && SOURCE_FOLLOWUP_RE.test(value);
+}
+
 export function normalizeNewsText(prompt) {
   return String(prompt || "")
     .replace(/^音频转写[：:]\s*/gm, "")
     .replace(/(?:AIA|AHA)(?=(圈|的|新聞|新闻|資訊|资讯))/gi, "AI")
+    .replace(/AZ(?=(新闻|新聞|資訊|资讯))/gi, "AI")
     .replace(/(夜夜圈|爷爷圈|爺爺圈)/g, "AI圈")
     .replace(/新闻秩序|新聞秩序/g, "新闻资讯")
     .replace(/食调|食條|十调|十條|十条/g, "10条")
+    .replace(/来远/g, "来源")
+    .replace(/中纹/g, "中文")
+    .replace(/翻一层/g, "翻译成")
     .replace(/\s+/g, " ")
     .trim();
 }

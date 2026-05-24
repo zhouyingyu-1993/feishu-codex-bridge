@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   isNewsQuestion,
+  isNewsSourceFollowUp,
   maybeAnswerNewsQuestion,
   normalizeNewsText,
   parseRssItems
@@ -37,6 +38,11 @@ test("detects news requests from audio transcripts", () => {
   assert.match(noisy, /AI圈/);
   assert.match(noisy, /新闻资讯/);
   assert.equal(isNewsQuestion(noisy), true);
+
+  const sourceRequest = normalizeNewsText("音频转写：把10条翻一层中纹然后再附上来远");
+  assert.match(sourceRequest, /中文/);
+  assert.match(sourceRequest, /来源/);
+  assert.equal(isNewsSourceFollowUp(sourceRequest), true);
 });
 
 test("parses rss news items", () => {
@@ -75,5 +81,19 @@ test("answers noisy transcribed news requests", async () => {
   });
 
   assert.match(answer, /我查到的 AI 新闻重点/);
+  assert.match(answer, /中国 AI 公司发布新模型/);
+});
+
+test("uses previous news prompt for source follow ups", async () => {
+  const fetchImpl = async () => ({ ok: true, text: async () => RSS });
+  const answer = await maybeAnswerNewsQuestion({
+    prompt: "音频转写：你為什麼沒有附上新聞的來源呢?我讓你附上來源呀",
+    previousPrompt: "把昨天發生的AI新聞資訊給我10條好嗎?",
+    fetchImpl,
+    now: new Date("2026-05-24T12:00:00Z")
+  });
+
+  assert.match(answer, /来源/);
+  assert.match(answer, /链接/);
   assert.match(answer, /中国 AI 公司发布新模型/);
 });
