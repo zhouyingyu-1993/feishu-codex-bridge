@@ -112,6 +112,24 @@ test("prefers file paths from the original user prompt", () => {
   assert.equal(parsed.relativeFile, "README.zh.md");
 });
 
+test("parses proposal sections without colons", () => {
+  const parsed = parseConfirmedEditProposal([
+    "文件：README.zh.md",
+    "",
+    "修改前",
+    "- 旧句子",
+    "",
+    "修改后",
+    "- 新句子",
+    "",
+    "确认后我再执行修改；回复 `确认` 执行。"
+  ].join("\n"), "/tmp/project");
+
+  assert.equal(parsed.file, "/tmp/project/README.zh.md");
+  assert.equal(parsed.before, "- 旧句子");
+  assert.equal(parsed.after, "- 新句子");
+});
+
 test("applies confirmed edits by exact replacement", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "feishu-bridge-test-"));
   const file = join(cwd, "README.zh.md");

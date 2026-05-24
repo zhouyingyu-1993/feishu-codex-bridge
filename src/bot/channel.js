@@ -524,8 +524,8 @@ function safeResolveFile(file, cwd) {
 }
 
 function extractProposalSection(proposal, label, stopLabels) {
-  const stop = stopLabels.map((item) => `${item}[：:]`).join("|");
-  const re = new RegExp(`${label}[：:]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stop})|\\n\\s*确认后|\\n\\s*回复|$)`);
+  const stop = stopLabels.map((item) => `${item}\\s*[：:]?`).join("|");
+  const re = new RegExp(`(?:^|\\n)\\s*${label}\\s*[：:]?\\s*\\n?([\\s\\S]*?)(?=\\n\\s*(?:${stop})|\\n\\s*确认后|\\n\\s*回复|$)`);
   return proposal.match(re)?.[1] || "";
 }
 
