@@ -13,6 +13,11 @@ import { PendingQueue } from "./pending-queue.js";
 import { ProcessPool } from "./process-pool.js";
 
 const DEBOUNCE_MS = 600;
+const BRIDGE_INSTRUCTIONS = [
+  "你正在通过飞书机器人回复用户。",
+  "执行任务前不要先发计划或过程说明；需要查看或修改文件时，直接完成操作。",
+  "最终回复要简短说明结果。若修改了文件，明确说“已完成”，并说明改了哪个文件和哪处内容；不要用“我先”“接下来”“将会”等还没完成的表述。"
+];
 
 export async function startChannel(deps) {
   const { cfg, agent, sessions, workspaces, controls } = deps;
@@ -216,7 +221,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
   }
 }
 
-function buildPrompt(batch, attachments) {
+export function buildPrompt(batch, attachments) {
   const lines = [];
   const first = batch[0];
   lines.push("<feishu_context>");
@@ -225,6 +230,10 @@ function buildPrompt(batch, attachments) {
   lines.push(`sender_id: ${first.senderId}`);
   if (first.threadId) lines.push(`thread_id: ${first.threadId}`);
   lines.push("</feishu_context>");
+  lines.push("");
+  lines.push("<bridge_instructions>");
+  lines.push(...BRIDGE_INSTRUCTIONS);
+  lines.push("</bridge_instructions>");
   lines.push("");
   lines.push(batch.map((message) => message.content || "").filter(Boolean).join("\n\n"));
   if (attachments.length) {
