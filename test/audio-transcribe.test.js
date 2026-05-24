@@ -7,7 +7,7 @@ import {
   meaningfulMessageText
 } from "../src/media/transcribe.js";
 
-test("recognizes audio-only messages without transcript", () => {
+test("stops any audio message without transcript", () => {
   assert.equal(
     hasAudioOnlyWithoutTranscript(
       [{ content: "[语音]" }],
@@ -22,6 +22,13 @@ test("recognizes audio-only messages without transcript", () => {
     ),
     false
   );
+  assert.equal(
+    hasAudioOnlyWithoutTranscript(
+      [{ content: "请总结这段语音" }],
+      [{ kind: "audio", path: "/tmp/a.ogg", transcriptionError: "missing permission" }]
+    ),
+    true
+  );
 });
 
 test("renders audio transcript sections", () => {
@@ -33,6 +40,7 @@ test("renders audio transcript sections", () => {
 
 test("filters placeholder-only audio message text", () => {
   assert.equal(meaningfulMessageText("[语音]"), "");
+  assert.equal(meaningfulMessageText("<audio key=\"file_v3_x\" duration=\"2s\"/>"), "");
   assert.equal(meaningfulMessageText("请总结这段语音"), "请总结这段语音");
 });
 

@@ -125,8 +125,7 @@ export function hasAudioOnlyWithoutTranscript(batch, attachments) {
   const hasAudio = attachments.some((file) => file.kind === "audio");
   if (!hasAudio) return false;
   const hasTranscript = attachments.some((file) => file.kind === "audio" && file.transcript);
-  if (hasTranscript) return false;
-  return !batch.some((message) => meaningfulMessageText(message.content));
+  return !hasTranscript;
 }
 
 export function audioTranscriptionFailureMessage(attachments) {
@@ -146,11 +145,15 @@ export function audioTranscriptionFailureMessage(attachments) {
 export function meaningfulMessageText(content) {
   return String(content || "")
     .replace(/^\[(语音|音频|图片|文件|视频|voice|audio|image|file|video)\]$/i, "")
+    .replace(/<audio\b[^>]*\/?>/gi, "")
     .trim();
 }
 
 function explainTranscriptionError(err) {
   const message = err?.message || String(err);
+  const code = err?.response?.data?.code;
+  const msg = err?.response?.data?.msg;
+  if (code || msg) return `${code || "unknown"} ${msg || message}`;
   if (/ENOENT/.test(message) && /ffmpeg/.test(message)) return "本机没有安装 ffmpeg，无法把飞书语音转成语音识别需要的 PCM 格式。";
   if (/1040101/.test(message) || /invalid param/i.test(message)) return "飞书语音识别参数被拒绝，可能是音频格式或应用权限不满足要求。";
   if (/permission|scope|forbidden|unauthorized|999916/i.test(message)) return "飞书应用可能还没有开通语音识别权限。";
