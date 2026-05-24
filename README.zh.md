@@ -8,7 +8,7 @@
 
 ## 能做什么
 
-- 飞书里不管是私聊、群里 @bot，还是发图片和文件，都能直接交给本机的 `codex` 命令。
+- 飞书里不管是私聊、群里 @bot，还是发图片、文件和 60 秒以内语音，都能处理；语音会先转文字再交给后续流程。
 - Codex 的进度可以通过飞书卡片、Markdown 流式消息，或最终文本形式返回。
 - 每个聊天、话题和工作空间都有各自的 Codex 会话。
 - 新消息一来就会打断当前 run，连着发得很快的消息会合并到下一次请求里。
@@ -32,6 +32,7 @@ codex login
 
 - 一个飞书 / Lark PersonalAgent 应用。第一次运行时会尝试进入飞书 SDK 的扫码创建向导。
 - 如果要使用云文档评论、创建文档、搜索父文档或知识库节点，需要在飞书开放平台给应用开通对应的云文档、搜索、评论权限，并把机器人加入目标文档/知识库。
+- 如果要读取语音，需要给应用开通飞书 `speech_to_text` 语音识别权限；本机还需要安装 `ffmpeg` 用来把飞书语音转成识别接口需要的 PCM。
 - 可选安装 `lark-cli`。它能让 Codex 在需要深度读取飞书资料时调用更多飞书命令。
 
 ## 安装
@@ -138,7 +139,7 @@ feishu-codex-bridge unregister
 ~/.feishu-codex-bridge/sessions.json     每个聊天的 Codex session
 ~/.feishu-codex-bridge/workspaces.json   工作空间和当前 cwd
 ~/.feishu-codex-bridge/processes.json    本机进程注册表
-~/.feishu-codex-bridge/media/            下载的图片 / 文件，24 小时清理
+~/.feishu-codex-bridge/media/            下载的图片 / 文件 / 语音，24 小时清理
 ~/.feishu-codex-bridge/logs/             JSONL 日志，7 天清理
 ```
 

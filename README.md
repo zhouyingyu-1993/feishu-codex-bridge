@@ -9,7 +9,7 @@ Claude Code.
 
 ## What It Does
 
-- Forwards Feishu/Lark direct messages, group mentions, files, and images to a local `codex` CLI process.
+- Handles Feishu/Lark direct messages, group mentions, files, images, and audio messages up to 60 seconds. Audio is transcribed before the downstream flow runs.
 - Streams Codex progress back to Feishu cards, markdown, or final text replies.
 - Keeps one Codex session per chat/topic/workspace.
 - Interrupts an active run when a new message arrives, then batches rapid messages into the next run.
@@ -34,6 +34,7 @@ codex login
 
 - A Feishu/Lark PersonalAgent app. On first run, the bridge tries to open the Feishu SDK QR-code registration wizard.
 - For cloud-doc comments, document creation, parent document search, or wiki-node creation, enable the relevant Feishu/Lark cloud-document, search, and comment permissions, and add the bot to the target document or wiki space.
+- For audio transcription, enable the Feishu/Lark `speech_to_text` permission for the app and install `ffmpeg` locally so voice notes can be converted to PCM.
 - Optional: install `lark-cli` so Codex can call deeper Feishu/Lark commands when it needs more cloud-context.
 
 ## Install
@@ -149,7 +150,7 @@ Empty lists mean unrestricted.
 ~/.feishu-codex-bridge/sessions.json     Codex session id per chat/topic
 ~/.feishu-codex-bridge/workspaces.json   Named workspaces and per-chat cwd
 ~/.feishu-codex-bridge/processes.json    Local process registry
-~/.feishu-codex-bridge/media/            Downloaded images/files, cleaned after 24h
+~/.feishu-codex-bridge/media/            Downloaded images/files/audio, cleaned after 24h
 ~/.feishu-codex-bridge/logs/             JSONL runtime logs, cleaned after 7 days
 ```
 

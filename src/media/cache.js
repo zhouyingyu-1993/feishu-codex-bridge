@@ -30,7 +30,7 @@ export class MediaCache {
     const path = join(dir, fileName);
     try {
       await stat(path);
-      return { path, kind: resource.type || "file", originalName: resource.fileName || "" };
+      return { path, kind: resource.type || "file", originalName: resource.fileName || "", durationMs: resource.durationMs || 0 };
     } catch {
       // Not cached yet.
     }
@@ -39,7 +39,7 @@ export class MediaCache {
       path: { message_id: item.messageId, file_key: resource.fileKey }
     });
     await result.writeFile(path);
-    return { path, kind: resource.type || "file", originalName: resource.fileName || "" };
+    return { path, kind: resource.type || "file", originalName: resource.fileName || "", durationMs: resource.durationMs || 0 };
   }
 }
 

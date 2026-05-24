@@ -8,6 +8,7 @@ import {
   buildApprovedPrompt,
   buildPrompt,
   buildProposalPrompt,
+  buildUserText,
   isConfirmableProposal,
   isEditApproval,
   isEditCancellation,
@@ -73,6 +74,27 @@ test("builds approved prompt that applies only confirmed changes", () => {
   assert.match(prompt, /只执行已确认的修改/);
   assert.match(prompt, /旧句子/);
   assert.match(prompt, /新句子/);
+});
+
+test("includes audio transcript in user text and prompt", () => {
+  const batch = [{
+    chatId: "chat",
+    chatType: "p2p",
+    senderId: "user",
+    content: "[语音]",
+    resources: []
+  }];
+  const attachments = [{
+    path: "/tmp/audio.ogg",
+    kind: "audio",
+    originalName: "",
+    transcript: "请一句话介绍这个项目"
+  }];
+
+  assert.equal(buildUserText(batch, attachments), "音频转写：请一句话介绍这个项目");
+  const prompt = buildPrompt(batch, attachments);
+  assert.match(prompt, /音频转写：请一句话介绍这个项目/);
+  assert.match(prompt, /audio\.ogg.*audio.*已转写/);
 });
 
 test("requires before and after text for confirmable proposals", () => {

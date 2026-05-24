@@ -7,6 +7,13 @@ import { reduceRunState, initialRunState } from "../agent/events.js";
 import { renderRunCard, renderText } from "../card/render.js";
 import { logEvent } from "../core/logger.js";
 import { MediaCache } from "../media/cache.js";
+import {
+  audioTranscriptionFailureMessage,
+  audioTranscriptSection,
+  hasAudioOnlyWithoutTranscript,
+  meaningfulMessageText,
+  transcribeAudioAttachments
+} from "../media/transcribe.js";
 import { tryHandleCommand } from "../commands/index.js";
 import { maybeAnswerQuickLocalQuestion } from "../quick/project-summary.js";
 import { isCloudDocumentRequest, runCloudDocumentRequest } from "../cloud-docs/create.js";
@@ -183,9 +190,20 @@ async function runAgentBatch({ channel, agent, sessions, workspaces, activeRuns,
   if (!first || !last) return;
   const resources = batch.flatMap((message) => (message.resources || []).map((resource) => ({ messageId: message.messageId, resource })));
   const attachments = await media.resolve(first.chatId, resources);
+  await transcribeAudioAttachments({ channel, attachments });
+  if (hasAudioOnlyWithoutTranscript(batch, attachments)) {
+    await channel.send(first.chatId, { markdown: audioTranscriptionFailureMessage(attachments) }, { replyTo: last.messageId });
+    return;
+  }
   const cwd = workspaces.cwdFor(scope) || controls.cfg.preferences.defaultCwd || homedir();
   await ensureDirectory(cwd);
-  const userText = batch.map((message) => message.content || "").filter(Boolean).join("\n\n");
+  const userText = buildUserText(batch, attachments);
+  const quickAnswer = await maybeAnswerQuickLocalQuestion({ prompt: userText, cwd });
+  if (quickAnswer) {
+    await channel.send(last.chatId, { markdown: quickAnswer }, { replyTo: last.messageId });
+    await logEvent("quick.answer", { scope, cwd, source: "batch", preview: quickAnswer.slice(0, 120) });
+    return;
+  }
   if (isCloudDocumentRequest(userText)) {
     await runCloudDocumentRequest({ channel, agent, sessions, workspaces, activeRuns, controls, scope, msg: last, cwd, userText });
     return;
@@ -355,11 +373,11 @@ export function buildPrompt(batch, attachments) {
   lines.push(...BRIDGE_INSTRUCTIONS);
   lines.push("</bridge_instructions>");
   lines.push("");
-  lines.push(batch.map((message) => message.content || "").filter(Boolean).join("\n\n"));
+  lines.push(buildUserText(batch, attachments) || "请看下面的附件。");
   if (attachments.length) {
     lines.push("");
     lines.push("附件（本地路径）：");
-    for (const file of attachments) lines.push(`- ${file.path}${file.originalName ? ` (${file.originalName})` : ""} — ${file.kind}`);
+    for (const file of attachments) lines.push(attachmentLine(file));
   }
   return lines.join("\n");
 }
@@ -382,13 +400,27 @@ export function buildProposalPrompt(batch, attachments) {
   lines.push("如果无法确定原文或新文，请说明需要用户补充，不要猜测，也不要改文件。");
   lines.push("</bridge_instructions>");
   lines.push("");
-  lines.push(batch.map((message) => message.content || "").filter(Boolean).join("\n\n"));
+  lines.push(buildUserText(batch, attachments) || "请看下面的附件。");
   if (attachments.length) {
     lines.push("");
     lines.push("附件（本地路径）：");
-    for (const file of attachments) lines.push(`- ${file.path}${file.originalName ? ` (${file.originalName})` : ""} — ${file.kind}`);
+    for (const file of attachments) lines.push(attachmentLine(file));
   }
   return lines.join("\n");
+}
+
+export function buildUserText(batch, attachments = []) {
+  const texts = batch
+    .map((message) => meaningfulMessageText(message.content))
+    .filter(Boolean);
+  const transcript = audioTranscriptSection(attachments);
+  return [...texts, transcript].filter(Boolean).join("\n\n");
+}
+
+function attachmentLine(file) {
+  const name = file.originalName ? ` (${file.originalName})` : "";
+  const extra = file.kind === "audio" && file.transcript ? "，已转写" : "";
+  return `- ${file.path}${name} — ${file.kind}${extra}`;
 }
 
 export function buildApprovedPrompt(pendingEdit) {
