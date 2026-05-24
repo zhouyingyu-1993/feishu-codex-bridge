@@ -67,3 +67,15 @@ test("quickly answers main files questions", async () => {
   assert.match(answer, /package\.json/);
   await rm(dir, { recursive: true, force: true });
 });
+
+test("quickly answers capability questions", async () => {
+  const answer = await maybeAnswerQuickLocalQuestion({
+    prompt: "你好，你现在能做什么？",
+    cwd: process.cwd()
+  });
+
+  assert.match(answer, /查看说明/);
+  assert.match(answer, /修改前/);
+  assert.match(answer, /确认/);
+  assert.match(answer, /取消/);
+});

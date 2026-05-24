@@ -6,6 +6,7 @@ export async function maybeAnswerQuickLocalQuestion({ prompt, cwd }) {
   if (summary) return summary;
 
   const text = String(prompt || "").trim();
+  if (isCapabilityQuestion(text)) return answerCapabilities();
   if (isMainFilesQuestion(text)) return answerMainFiles(cwd);
   if (isScriptsQuestion(text)) return answerScripts(cwd);
   if (isProjectTreeQuestion(text)) return answerProjectTree(cwd);
@@ -63,6 +64,22 @@ async function answerProjectTree(cwd) {
     .slice(0, 16);
   if (!visible.length) return "";
   return `当前项目顶层结构：\n${visible.map((name) => `- \`${name}\``).join("\n")}`;
+}
+
+function answerCapabilities() {
+  return [
+    "我可以帮你在当前项目里查看说明、梳理文件、分析报错、运行检查和整理修改建议。",
+    "如果你要改文件，我会先列出“修改前”和“修改后”，等你回复 `确认` 后才真正执行；回复 `取消` 就放弃。"
+  ].join("\n");
+}
+
+function isCapabilityQuestion(text) {
+  return [
+    /^(你好|您好|hi|hello)[，,\s]*(你)?(现在)?(能|可以).*(做什么|干什么|帮.*什么)/i,
+    /^(你)?(现在)?(能|可以).*(做什么|干什么|帮.*什么)/,
+    /(介绍|说说).*(能力|功能)/,
+    /help me|what can you do/i
+  ].some((pattern) => pattern.test(text));
 }
 
 function isProjectSummaryQuestion(text) {
