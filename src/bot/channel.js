@@ -212,7 +212,19 @@ async function runEditProposal({ channel, agent, sessions, activeRuns, pendingEd
   });
   const handle = activeRuns.register(scope, run);
   const idleMs = idleMsFor(sessions, controls, scope);
-  const state = await replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, cfg: controls.cfg, idleMs, saveSession: false }).finally(() => {
+  const state = await replyWithRun({
+    channel,
+    run,
+    handle,
+    sessions,
+    scope,
+    cwd,
+    msg,
+    cfg: controls.cfg,
+    idleMs,
+    saveSession: false,
+    renderState: renderProposalState
+  }).finally(() => {
     activeRuns.unregister(scope, run);
   });
   if (state.terminal === "done" && isConfirmableProposal(state.text)) {
@@ -243,7 +255,7 @@ async function runApprovedEdit({ channel, agent, sessions, activeRuns, pendingEd
   });
 }
 
-async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, cfg, idleMs, saveSession = true }) {
+async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, cfg, idleMs, saveSession = true, renderState = (state) => state }) {
   const replyMode = cfg.preferences.replyMode;
   const showToolCalls = cfg.preferences.showToolCalls;
   let state = { ...initialRunState };
@@ -289,7 +301,7 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
       card: {
         initial: renderRunCard(state, { showToolCalls }),
         producer: async (ctrl) => {
-          await drive((next) => ctrl.update(renderRunCard(next, { showToolCalls })));
+          await drive((next) => ctrl.update(renderRunCard(renderState(next), { showToolCalls })));
         }
       }
     }, sendOpts);
@@ -304,6 +316,10 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     await channel.send(msg.chatId, { markdown: renderText(state, showToolCalls) }, sendOpts);
   }
   return state;
+}
+
+function renderProposalState(state) {
+  return state.terminal === "done" ? { ...state, terminal: "pending_confirmation" } : state;
 }
 
 export function buildPrompt(batch, attachments) {

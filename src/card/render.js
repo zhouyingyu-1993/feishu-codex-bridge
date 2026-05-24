@@ -108,13 +108,14 @@ function titleFor(terminal) {
   if (terminal === "error") return "Codex 出错";
   if (terminal === "interrupted") return "Codex 已停止";
   if (terminal === "idle_timeout") return "Codex 超时停止";
+  if (terminal === "pending_confirmation") return "等待确认修改";
   return "Codex 正在处理";
 }
 
 function templateFor(terminal) {
   if (terminal === "done") return "green";
   if (terminal === "error" || terminal === "idle_timeout") return "red";
-  if (terminal === "interrupted") return "yellow";
+  if (terminal === "interrupted" || terminal === "pending_confirmation") return "yellow";
   return "blue";
 }
 
