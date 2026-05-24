@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
-import { stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import { Domain, LoggerLevel, createLarkChannel } from "@larksuiteoapi/node-sdk";
 import { isChatAllowed, isUserAllowed } from "../config/schema.js";
 import { reduceRunState, initialRunState } from "../agent/events.js";
@@ -239,20 +240,17 @@ async function runEditProposal({ channel, agent, sessions, activeRuns, pendingEd
 }
 
 async function runApprovedEdit({ channel, agent, sessions, activeRuns, pendingEdit, controls, scope, msg }) {
-  const cwd = pendingEdit.cwd;
-  await ensureDirectory(cwd);
-  const run = agent.run({
-    prompt: buildApprovedPrompt(pendingEdit),
-    sessionId: "",
-    cwd,
-    images: pendingEdit.images || [],
-    stopGraceMs: controls.cfg.preferences.stopGraceMs
-  });
-  const handle = activeRuns.register(scope, run);
-  const idleMs = idleMsFor(sessions, controls, scope);
-  await replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, cfg: controls.cfg, idleMs }).finally(() => {
-    activeRuns.unregister(scope, run);
-  });
+  const result = await applyConfirmedEdit(pendingEdit).catch((err) => ({
+    ok: false,
+    message: `无法自动执行：${err?.message || String(err)}。文件没有被改动。`
+  }));
+  const state = {
+    ...initialRunState,
+    terminal: result.ok ? "done" : "error",
+    footer: result.ok ? "done" : "failed",
+    text: result.message
+  };
+  await sendRunState({ channel, msg, cfg: controls.cfg, state });
 }
 
 async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, cfg, idleMs, saveSession = true, renderState = (state) => state }) {
@@ -316,6 +314,15 @@ async function replyWithRun({ channel, run, handle, sessions, scope, cwd, msg, c
     await channel.send(msg.chatId, { markdown: renderText(state, showToolCalls) }, sendOpts);
   }
   return state;
+}
+
+async function sendRunState({ channel, msg, cfg, state }) {
+  const sendOpts = { replyTo: msg.messageId };
+  if (cfg.preferences.replyMode === "card") {
+    await channel.send(msg.chatId, { card: renderRunCard(state, { showToolCalls: cfg.preferences.showToolCalls }) }, sendOpts);
+  } else {
+    await channel.send(msg.chatId, { markdown: renderText(state, cfg.preferences.showToolCalls) }, sendOpts);
+  }
 }
 
 function renderProposalState(state) {
@@ -388,6 +395,84 @@ export function buildApprovedPrompt(pendingEdit) {
   ].join("\n");
 }
 
+export async function applyConfirmedEdit(pendingEdit) {
+  const parsed = parseConfirmedEditProposal(pendingEdit.proposal, pendingEdit.cwd);
+  if (!parsed) {
+    return {
+      ok: false,
+      message: "无法自动执行：没有从待确认内容里解析出文件、修改前、修改后。文件没有被改动，请重新发起修改请求。"
+    };
+  }
+
+  const text = await readFile(parsed.file, "utf8").catch((err) => {
+    throw new Error(`无法读取文件 ${parsed.relativeFile}：${err?.message || String(err)}`);
+  });
+  const matches = countOccurrences(text, parsed.before);
+  if (matches === 0) {
+    return {
+      ok: false,
+      message: [
+        "无法自动执行：文件里没有找到“修改前”的原文。文件没有被改动。",
+        "",
+        `文件：${parsed.relativeFile}`,
+        "",
+        `修改前：${parsed.before}`,
+        "",
+        `修改后：${parsed.after}`
+      ].join("\n")
+    };
+  }
+  if (matches > 1) {
+    return {
+      ok: false,
+      message: [
+        `无法自动执行：“修改前”的原文在文件里出现了 ${matches} 次。文件没有被改动。`,
+        "",
+        `文件：${parsed.relativeFile}`,
+        "",
+        `修改前：${parsed.before}`,
+        "",
+        `修改后：${parsed.after}`
+      ].join("\n")
+    };
+  }
+
+  await writeFile(parsed.file, text.replace(parsed.before, parsed.after), "utf8").catch((err) => {
+    throw new Error(`无法写入文件 ${parsed.relativeFile}：${err?.message || String(err)}`);
+  });
+  await logEvent("edit.applied", {
+    cwd: pendingEdit.cwd,
+    file: parsed.relativeFile,
+    before: parsed.before.slice(0, 120),
+    after: parsed.after.slice(0, 120)
+  });
+  return {
+    ok: true,
+    message: [
+      "已完成。",
+      "",
+      `文件：${parsed.relativeFile}`,
+      "",
+      `修改前：${parsed.before}`,
+      "",
+      `修改后：${parsed.after}`
+    ].join("\n")
+  };
+}
+
+export function parseConfirmedEditProposal(proposal, cwd) {
+  const file = parseProposalFile(proposal, cwd);
+  const before = cleanProposalValue(extractProposalSection(proposal, "修改前", ["修改后"]));
+  const after = cleanProposalValue(extractProposalSection(proposal, "修改后", ["确认后", "回复"]));
+  if (!file || !before || !after) return null;
+  return {
+    file,
+    relativeFile: relative(resolve(cwd), file) || ".",
+    before,
+    after
+  };
+}
+
 export function requiresEditConfirmation(text) {
   const value = String(text || "").trim();
   if (!value) return false;
@@ -407,6 +492,52 @@ export function isEditCancellation(text) {
 export function isConfirmableProposal(text) {
   const value = String(text || "");
   return value.includes("修改前") && value.includes("修改后");
+}
+
+function parseProposalFile(proposal, cwd) {
+  const text = String(proposal || "");
+  const fileUrl = text.match(/file:\/\/([^)\s]+)/);
+  if (fileUrl) return safeResolveFile(decodeURIComponent(fileUrl[1]), cwd);
+  const absolute = text.match(/\/[^\s)`]+?\.[a-zA-Z0-9]+/);
+  if (absolute) return safeResolveFile(absolute[0], cwd);
+  const line = text.match(/文件[：:]\s*([^\n]+)/);
+  if (!line) return "";
+  const cleaned = line[1]
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[`*_]/g, "")
+    .trim();
+  return safeResolveFile(cleaned, cwd);
+}
+
+function safeResolveFile(file, cwd) {
+  const root = resolve(cwd);
+  const target = isAbsolute(file) ? resolve(file) : resolve(root, file);
+  const rel = relative(root, target);
+  if (rel.startsWith("..") || isAbsolute(rel)) return "";
+  return target;
+}
+
+function extractProposalSection(proposal, label, stopLabels) {
+  const stop = stopLabels.map((item) => `${item}[：:]`).join("|");
+  const re = new RegExp(`${label}[：:]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${stop})|\\n\\s*确认后|\\n\\s*回复|$)`);
+  return proposal.match(re)?.[1] || "";
+}
+
+function cleanProposalValue(value) {
+  let text = String(value || "").trim();
+  text = text.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim();
+  if (text.startsWith("`") && text.endsWith("`")) text = text.slice(1, -1).trim();
+  return text;
+}
+
+function countOccurrences(text, search) {
+  let count = 0;
+  let index = 0;
+  while (search && (index = text.indexOf(search, index)) !== -1) {
+    count += 1;
+    index += search.length;
+  }
+  return count;
 }
 
 function idleMsFor(sessions, controls, scope) {

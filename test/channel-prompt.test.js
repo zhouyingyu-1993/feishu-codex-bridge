@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
+  applyConfirmedEdit,
   buildApprovedPrompt,
   buildPrompt,
   buildProposalPrompt,
   isConfirmableProposal,
   isEditApproval,
   isEditCancellation,
+  parseConfirmedEditProposal,
   requiresEditConfirmation
 } from "../src/bot/channel.js";
 
@@ -73,4 +78,53 @@ test("builds approved prompt that applies only confirmed changes", () => {
 test("requires before and after text for confirmable proposals", () => {
   assert.equal(isConfirmableProposal("修改前：旧\n修改后：新"), true);
   assert.equal(isConfirmableProposal("需要用户补充信息"), false);
+});
+
+test("parses confirmed edit proposals", () => {
+  const parsed = parseConfirmedEditProposal([
+    "文件：README.zh.md",
+    "",
+    "修改前：",
+    "`旧句子`",
+    "",
+    "修改后：",
+    "`新句子`",
+    "",
+    "确认后我再执行修改；回复 `确认` 执行。"
+  ].join("\n"), "/tmp/project");
+
+  assert.equal(parsed.file, "/tmp/project/README.zh.md");
+  assert.equal(parsed.relativeFile, "README.zh.md");
+  assert.equal(parsed.before, "旧句子");
+  assert.equal(parsed.after, "新句子");
+});
+
+test("applies confirmed edits by exact replacement", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "feishu-bridge-test-"));
+  const file = join(cwd, "README.zh.md");
+  await writeFile(file, "第一句\n旧句子\n第三句\n", "utf8");
+
+  const result = await applyConfirmedEdit({
+    cwd,
+    proposal: "文件：README.zh.md\n\n修改前：`旧句子`\n\n修改后：`新句子`"
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(result.message, /已完成/);
+  assert.equal(await readFile(file, "utf8"), "第一句\n新句子\n第三句\n");
+});
+
+test("does not apply ambiguous confirmed edits", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "feishu-bridge-test-"));
+  const file = join(cwd, "README.zh.md");
+  await writeFile(file, "旧句子\n旧句子\n", "utf8");
+
+  const result = await applyConfirmedEdit({
+    cwd,
+    proposal: "文件：README.zh.md\n\n修改前：`旧句子`\n\n修改后：`新句子`"
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /出现了 2 次/);
+  assert.equal(await readFile(file, "utf8"), "旧句子\n旧句子\n");
 });
